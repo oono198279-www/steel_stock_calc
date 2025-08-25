@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>鋼材在庫→加工可能数 計算（自動旋盤向け）</title>
+<style>
+:root{--bg:#0b0c10;--panel:#111318;--ink:#e8eaed;--muted:#9aa0a6;--accent:#6ee7b7;--warn:#fbbf24;--grid:#22262e}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,system-ui,"Segoe UI",Roboto,"Hiragino Sans",Meiryo,Arial,sans-serif;display:flex;flex-direction:column;min-height:100vh}
+.wrap{max-width:1200px;margin-inline:auto;padding:20px}
+header{position:sticky;top:0;background:linear-gradient(0deg,rgba(11,12,16,.0),rgba(11,12,16,.8));backdrop-filter:blur(6px);z-index:0}
+h1{font-size:clamp(20px,2.4vw,28px);margin:16px 0 6px}
+p.subtitle{margin:0 0 12px;color:var(--muted)}
+.grid{display:grid;gap:16px;grid-template-columns:1fr;flex:1}
+@media (min-width:980px){.grid{grid-template-columns:340px 1fr}}
+.card{background:var(--panel);border:1px solid var(--grid);border-radius:16px;padding:16px}
+.card h2{margin:0 0 10px;font-size:18px}
+.inputs{overflow:auto;position:relative;padding-bottom:72px}
+.inputs::after{content:"";position:sticky;left:0;top:0;bottom:0;width:14px;background:var(--panel);z-index:40;pointer-events:none;display:block}
+table{border-collapse:collapse;width:max-content;min-width:100%}
+thead th{position:sticky;top:0;background:var(--panel);z-index:20}
+th,td{border-bottom:1px solid var(--grid);padding:8px;text-align:left;vertical-align:middle}
+tr:nth-child(even) td{background:rgba(255,255,255,0.02)}
+/* 固定列 */
+th.rowhead{white-space:nowrap;font-weight:600;color:var(--muted);background:var(--panel);position:sticky;left:0;z-index:30;box-shadow:2px 0 0 0 var(--grid);min-width:200px}
+/* データ列 */
+thead th:not(.rowhead),tbody td,tfoot td{min-width:240px}
+input[type="text"],input[type="number"]{width:100%;box-sizing:border-box;padding:6px 8px;border-radius:10px;border:1px solid var(--grid);background:#0e1116;color:var(--ink);font-size:15px}
+input[type="number"]::-webkit-outer-spin-button,input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.pill{display:inline-flex;gap:8px;align-items:center;border:1px solid var(--grid);background:#0e1116;padding:8px 10px;border-radius:999px;font-size:13px;color:var(--muted)}
+.btn{cursor:pointer;appearance:none;border:1px solid var(--grid);background:#0e1116;color:#e8eaed;padding:8px 12px;border-radius:10px;font-size:14px}
+.btn:hover{border-color:#394049}
+.btn.primary{border-color:transparent;background:linear-gradient(135deg,#10b981,#22d3ee);color:#072619;font-weight:700}
+.btn.warn{border-color:transparent;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#4a2d00;font-weight:700}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.out{font-variant-numeric:tabular-nums;display:flex;gap:8px;align-items:center}
+.out .num{font-size:22px;font-weight:800;letter-spacing:.02em}
+.small{color:var(--muted);font-size:12px}
+footer{position:sticky;bottom:0;background:#111318;border-top:1px solid var(--grid);z-index:50;box-shadow:0 -4px 12px rgba(0,0,0,.35)}
+.footwrap{max-width:1200px;margin-inline:auto;padding:10px 20px;display:flex;gap:8px;align-items:center;overflow:auto}
+.chip{display:inline-flex;gap:8px;align-items:center;background:#0e1116;border:1px solid var(--grid);border-radius:999px;padding:6px 10px;white-space:nowrap}
+.chip .label{color:var(--muted);font-size:12px}
+.chip .val{font-weight:800}
+/* モバイル幅 */
+@media (max-width:780px){thead th:not(.rowhead),tbody td,tfoot td{min-width:40vw}th.rowhead{min-width:45vw}}
+</style>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0b0c10">
+
+<!-- iOS向け（ホーム画面アイコン/フルスクリーン） -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="鋼材計算">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>鋼材在庫 → 加工可能個数 計算（Excelロジック互換）</h1>
+    <p class="subtitle">自動旋盤向け：1本あたりの生産数・在庫本数からの総生産可能数を即時計算。入力はローカル保存（localStorage）。</p>
+    <span class="pill">保存名: <input id="saveKey" style="width:140px" value="steel-calc-v1"/></span>
+  </div>
+</header>
+<div class="wrap grid">
+  <section class="card">
+    <h2>使い方</h2>
+    <ol class="small">
+      <li>単位：長さ=mm, 重量=kg。半角で入力。</li>
+      <li>式（Excel再現）：
+        <div class="small"><code>1本あたり = INT((鋼材長−端材長−SC) ÷ (製品全長 + 突切厚 + ﾒｲﾝ取代 + ﾊﾞｯｸ取代))</code></div>
+        <div class="small"><code>本数合計 = INT(束重量 ÷ 単重) + 鋼材本数</code></div>
+        <div class="small"><code>加工可能個数 = 1本あたり × 本数合計</code></div>
+      </li>
+      <li>品番列は追加/削除可。入力は自動保存。</li>
+    </ol>
+    <div class="toolbar" style="margin-top:10px">
+      <button class="btn primary" id="addCol">＋ 品番を追加</button>
+      <button class="btn" id="saveNow">手動保存</button>
+      <button class="btn warn" id="resetAll">全消去（初期値に戻す）</button>
+    </div>
+  </section>
+
+  <section class="card inputs">
+    <div class="toolbar" style="justify-content:space-between; margin-bottom:8px">
+      <div class="small">iPhoneの自動ズーム回避済み（入力16px）。</div>
+      <div class="small">計算セルは差分更新でサクサク。</div>
+    </div>
+    <table id="t">
+      <thead>
+        <tr>
+          <th class="rowhead">項目</th>
+          <th>品番A</th>
+          <th>品番B</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+      <tfoot>
+        <tr>
+          <th class="rowhead">操作</th>
+          <td><button class="btn" data-del="0">この品番を削除</button></td>
+          <td><button class="btn" data-del="1">この品番を削除</button></td>
+        </tr>
+      </tfoot>
+    </table>
+  </section>
+</div>
+<footer>
+  <div class="footwrap" id="footerList"></div>
+</footer>
+<script>
+const initialProducts=[
+ {"品番":"12-3456","製品名":"ﾌﾟﾗｸﾞ","鋼材束重量":277,"鋼材本数(本数)":5,"鋼材単重":3.09,"鋼材長さ(mm)":3000,"端材長さ(mm)":255,"ｼｮｰﾄｶｯﾄ長さ(mm)":20,"製品全長(mm)":21,"突切厚み(mm)":2,"メイン側端面取代":0.1,"バック側端面取代":0.1},
+ {"品番":"09-8765","製品名":"ｼﾞｬｯｸ","鋼材束重量":244,"鋼材本数(本数)":9,"鋼材単重":3.09,"鋼材長さ(mm)":3000,"端材長さ(mm)":262.5,"ｼｮｰﾄｶｯﾄ長さ(mm)":20,"製品全長(mm)":22,"突切厚み(mm)":2,"メイン側端面取代":0.1,"バック側端面取代":0.1}
+];
+
+const rowDefs=[
+ {key:"品番",label:"品番",type:"text"},
+ {key:"製品名",label:"製品名",type:"text"},
+ {key:"鋼材束重量",label:"鋼材束重量",unit:"kg",step:"0.01",type:"number"},
+ {key:"鋼材本数(本数)",label:"鋼材本数(本数)",unit:"本",step:"1",type:"number"},
+ {key:"鋼材単重",label:"鋼材単重",unit:"kg",step:"0.01",type:"number"},
+ {key:"鋼材長さ(mm)",label:"鋼材長さ",unit:"mm",step:"0.1",type:"number"},
+ {key:"端材長さ(mm)",label:"端材長さ",unit:"mm",step:"0.1",type:"number"},
+ {key:"ｼｮｰﾄｶｯﾄ長さ(mm)",label:"ｼｮｰﾄｶｯﾄ長さ",unit:"mm",step:"0.1",type:"number"},
+ {key:"製品全長(mm)",label:"製品全長",unit:"mm",step:"0.1",type:"number"},
+ {key:"突切厚み(mm)",label:"突切厚み",unit:"mm",step:"0.1",type:"number"},
+ {key:"メイン側端面取代",label:"メイン側端面取代",unit:"mm",step:"0.01",type:"number"},
+ {key:"バック側端面取代",label:"バック側端面取代",unit:"mm",step:"0.01",type:"number"},
+ {key:"calc_1本あたり",label:"鋼材一本あたりの生産数",calc:true},
+ {key:"calc_本数合計",label:"鋼材本数合計",calc:true},
+ {key:"calc_加工可能個数",label:"加工可能個数",calc:true}
+];
+
+const elTbody=document.getElementById('tbody');
+const elAddCol=document.getElementById('addCol');
+const elReset=document.getElementById('resetAll');
+const elSaveNow=document.getElementById('saveNow');
+const elSaveKey=document.getElementById('saveKey');
+const elTable=document.getElementById('t');
+const elFooterList=document.getElementById('footerList');
+
+function getStoreKey(){ return (elSaveKey?.value||'steel-calc-v1').trim(); }
+
+function loadData(){
+  const k=getStoreKey();
+  try{
+    const raw=localStorage.getItem(k);
+    if(!raw) return structuredClone(initialProducts);
+    const arr=JSON.parse(raw);
+    if(!Array.isArray(arr)||arr.length===0) return structuredClone(initialProducts);
+    return arr;
+  }catch(e){ console.warn('load failed',e); return structuredClone(initialProducts); }
+}
+function saveData(products){
+  try{ localStorage.setItem(getStoreKey(), JSON.stringify(products)); }
+  catch(e){ console.warn('save failed',e); }
+}
+
+// --- 計算（Excel互換） ---
+function calc(p){
+  const n=v=>isFinite(+v)?+v:0;
+  const L=n(p['鋼材長さ(mm)']), off=n(p['端材長さ(mm)']), sc=n(p['ｼｮｰﾄｶｯﾄ長さ(mm)']);
+  const part=n(p['製品全長(mm)']), cut=n(p['突切厚み(mm)']), fm=n(p['メイン側端面取代']), fb=n(p['バック側端面取代']);
+  const feedPer=part+cut+fm+fb;
+  const usable=L-off-sc;
+  const pcsPerBar=feedPer>0?Math.floor(usable/feedPer):0;
+
+  const bundleKg=n(p['鋼材束重量']), unitKg=n(p['鋼材単重']), countBars=n(p['鋼材本数(本数)']);
+  const barsFromKg=unitKg>0?Math.floor(bundleKg/unitKg):0;
+  const totalBars=barsFromKg+countBars;
+  const totalPcs=pcsPerBar*totalBars;
+  return {pcsPerBar,totalBars,totalPcs};
+}
+const fmtInt=n=>(isFinite(+n)?Math.floor(+n):0).toLocaleString();
+
+// --- 列ごとの差分更新 ---
+function updateCalcForCol(i){
+  const r=calc(products[i]);
+  const pcs=document.querySelector(`[data-calc="pcs"][data-col="${i}"]`);
+  const bars=document.querySelector(`[data-calc="bars"][data-col="${i}"]`);
+  const total=document.querySelector(`[data-calc="total"][data-col="${i}"]`);
+  if(pcs) pcs.textContent = `${fmtInt(r.pcsPerBar)} 個/本`;
+  if(bars) bars.textContent = `${fmtInt(r.totalBars)} 本`;
+  if(total) total.textContent = `${fmtInt(r.totalPcs)} 個`;
+  updateFooter();
+}
+
+// --- フッター：各品番の加工可能個数 ---
+function updateFooter(){
+  elFooterList.innerHTML='';
+  products.forEach((p,i)=>{
+    const r=calc(p);
+    const chip=document.createElement('div'); chip.className='chip';
+    const lab=document.createElement('span'); lab.className='label';
+    lab.textContent=(p['品番']||`品番${String.fromCharCode(65+i)}`)+' の加工可能個数';
+    const val=document.createElement('span'); val.className='val';
+    val.textContent=fmtInt(r.totalPcs)+' 個';
+    chip.appendChild(lab); chip.appendChild(val);
+    elFooterList.appendChild(chip);
+  });
+}
+
+// --- 全描画（列の増減時） ---
+function render(products){
+  // ヘッダ見出し
+  const ths=elTable.querySelectorAll('thead th');
+  products.forEach((p,i)=>{ if(ths[i+1]) ths[i+1].textContent=p['品番']||`品番${String.fromCharCode(65+i)}`; });
+  for(let j=products.length+1; j<ths.length; j++){ if(ths[j]) ths[j].textContent=`品番${String.fromCharCode(65+j-1)}`; }
+
+  // 本体
+  elTbody.innerHTML='';
+  rowDefs.forEach(row=>{
+    const tr=document.createElement('tr');
+    const th=document.createElement('th');
+    th.className='rowhead';
+    th.textContent=row.label+(row.unit?` (${row.unit})`:'');
+    tr.appendChild(th);
+
+    products.forEach((p,colIdx)=>{
+      const td=document.createElement('td');
+      if(row.calc){
+        const r=calc(p);
+        const div=document.createElement('div'); div.className='out';
+        const span=document.createElement('span'); span.className='num'; span.dataset.col=colIdx;
+        if(row.key==='calc_1本あたり'){ span.dataset.calc='pcs'; span.textContent=`${fmtInt(r.pcsPerBar)} 個/本`; }
+        if(row.key==='calc_本数合計'){ span.dataset.calc='bars'; span.textContent=`${fmtInt(r.totalBars)} 本`; }
+        if(row.key==='calc_加工可能個数'){ span.dataset.calc='total'; span.textContent=`${fmtInt(r.totalPcs)} 個`; }
+        div.appendChild(span); td.appendChild(div);
+      }else{
+        const inp=document.createElement('input');
+        inp.type=row.type||'text'; if(row.step) inp.step=row.step;
+        inp.value=p[row.key]??''; inp.dataset.key=row.key; inp.dataset.col=colIdx;
+        inp.addEventListener('input',ev=>{
+          const key=ev.currentTarget.dataset.key; const i=+ev.currentTarget.dataset.col;
+          const v=ev.currentTarget.type==='number'?(ev.currentTarget.value===''?'':+ev.currentTarget.value):ev.currentTarget.value;
+          products[i][key]=v; saveData(products);
+          if(key==='品番'){ const ths=elTable.querySelectorAll('thead th'); if(ths[i+1]) ths[i+1].textContent=(v||'').toString().trim()||`品番${String.fromCharCode(65+i)}`; }
+          updateCalcForCol(i);
+        });
+        td.appendChild(inp);
+      }
+      tr.appendChild(td);
+    });
+    elTbody.appendChild(tr);
+  });
+
+  // 削除ボタン
+  elTable.querySelectorAll('button[data-del]').forEach(btn=>{
+    btn.onclick=()=>{
+      const i=+btn.getAttribute('data-del');
+      if(!Number.isInteger(i)) return;
+      if(products.length<=1){ alert('少なくとも1列は必要です'); return; }
+      products.splice(i,1); saveData(products);
+      syncHeaderCols(products.length); render(products);
+    };
+  });
+
+  updateFooter();
+}
+
+// --- 見出し列の数合わせ ---
+function syncHeaderCols(n){
+  const theadRow=elTable.querySelector('thead tr');
+  while(theadRow.children.length<n+1){
+    const th=document.createElement('th');
+    th.textContent=`品番${String.fromCharCode(65+(theadRow.children.length-1))}`;
+    theadRow.appendChild(th);
+  }
+  while(theadRow.children.length>n+1){ theadRow.removeChild(theadRow.lastElementChild); }
+
+  const tfootRow=elTable.querySelector('tfoot tr');
+  while(tfootRow.children.length<n+1){
+    const td=document.createElement('td');
+    td.innerHTML=`<button class="btn" data-del="${tfootRow.children.length-1}">この品番を削除</button>`;
+    tfootRow.appendChild(td);
+  }
+  while(tfootRow.children.length>n+1){ tfootRow.removeChild(tfootRow.lastElementChild); }
+}
+
+// --- 初期化 ---
+let products=loadData();
+syncHeaderCols(products.length);
+render(products);
+
+elAddCol.onclick=()=>{
+  const blank={};
+  rowDefs.forEach(r=>{ if(!r.calc){ blank[r.key]=(r.type==='number')?0:''; }});
+  blank['品番']=`NEW-${Math.random().toString(36).slice(2,6).toUpperCase()}`;
+  products.push(blank); saveData(products);
+  syncHeaderCols(products.length); render(products);
+};
+elSaveNow.onclick=()=>saveData(products);
+elReset.onclick=()=>{
+  if(!confirm('ローカル保存を消して初期値に戻します。よろしいですか？')) return;
+  localStorage.removeItem(getStoreKey());
+  products=structuredClone(initialProducts);
+  syncHeaderCols(products.length); render(products);
+};
+elSaveKey?.addEventListener('change', ()=>{
+  products=loadData(); syncHeaderCols(products.length); render(products);
+});
+
+// 起動時に一度計算表示を確実に更新
+products.forEach((_,i)=>updateCalcForCol(i));
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(console.error);
+  });
+}
+</script>
+
+</body>
+</html>
