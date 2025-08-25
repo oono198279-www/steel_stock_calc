@@ -23,7 +23,17 @@ thead th{position:sticky;top:0;background:var(--panel);z-index:20}
 th,td{border-bottom:1px solid var(--grid);padding:8px;text-align:left;vertical-align:middle}
 tr:nth-child(even) td{background:rgba(255,255,255,0.02)}
 /* 固定列 */
-th.rowhead{white-space:nowrap;font-weight:600;color:var(--muted);background:var(--panel);position:sticky;left:0;z-index:30;box-shadow:2px 0 0 0 var(--grid);min-width:120px;font-size: 13px;}
+/* 項目列：PC */
+th.rowhead{
+  width:120px;                  /* 好みで 100–140px */
+  min-width:120px;
+  max-width:120px;
+  font-size:13px;               /* 文字を小さく */
+  line-height:1.3;
+  white-space:normal;           /* 折り返し許可 */
+  word-break:keep-all;
+  overflow-wrap:anywhere;
+}
 /* データ列 */
 thead th:not(.rowhead),tbody td,tfoot td{min-width:240px}
 input[type="text"],input[type="number"]{width:100%;box-sizing:border-box;padding:6px 8px;border-radius:10px;border:1px solid var(--grid);background:#0e1116;color:var(--ink);font-size:15px}
@@ -43,7 +53,16 @@ footer{position:sticky;bottom:0;background:#111318;border-top:1px solid var(--gr
 .chip .label{color:var(--muted);font-size:12px}
 .chip .val{font-weight:800}
 /* モバイル幅 */
-@media (max-width:780px){thead th:not(.rowhead),tbody td,tfoot td{min-width:40vw}th.rowhead{min-width:45vw}}
+@media (max-width:780px){
+  th.rowhead{
+    width:32vw;                 /* 例：32% 幅。好みで 30–38vw */
+    min-width:32vw;
+    max-width:32vw;
+    font-size:12px;             /* さらに小さく */
+    line-height:1.25;
+  }
+}
+
 </style>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0b0c10">
