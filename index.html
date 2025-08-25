@@ -74,6 +74,51 @@ table{
     font-size: 12px; line-height: 1.25;
   }
 }
+/* ===== フッターを高く＆文字大きく ===== */
+:root{
+  /* 好きな高さに調整可（今は約3倍想定） */
+  --footer-h: 150px;
+}
+
+footer{
+  position: sticky;
+  bottom: 0;
+  background: #111318;
+  border-top: 1px solid var(--grid);
+  z-index: 50;                     /* 最前面にしたいなら 50 のまま */
+  box-shadow: 0 -6px 18px rgba(0,0,0,.35);
+}
+
+.footwrap{
+  max-width: 1200px;
+  margin-inline: auto;
+  /* 高さを “最低でも” これだけ確保 */
+  min-height: var(--footer-h);
+  padding: 20px;                   /* 余白を少し増量 */
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  overflow: auto;                  /* 横スクロール */
+}
+
+/* チップの見た目を大きく */
+.chip{
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  background: #0e1116;
+  border: 1px solid var(--grid);
+  border-radius: 999px;
+  padding: 10px 16px;              /* ふっくら */
+  white-space: nowrap;
+}
+.chip .label{ font-size: 14px; color: var(--muted); }
+.chip .val{ font-size: 28px; font-weight: 800; }
+
+/* フッターが高くなったので、表の下に余白を確保（隠れ防止） */
+.inputs{
+  padding-bottom: calc(var(--footer-h) + 24px);
+}
 </style>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0b0c10">
@@ -334,6 +379,28 @@ elSaveKey?.addEventListener('change', ()=>{
 
 // 起動時に一度計算表示を確実に更新
 products.forEach((_,i)=>updateCalcForCol(i));
+// ===== 表(.inputs) と フッター(.footwrap) の横スクロール連動 =====
+(function syncHorizontalScroll(){
+  const container = document.querySelector('.inputs');
+  const footerBar = document.querySelector('.footwrap');
+  if(!container || !footerBar) return;
+
+  let lock = false;
+  function linkScroll(from, to){
+    if(lock) return;
+    lock = true;
+    // スクロール量を割合で同期（幅が違っても追従）
+    const r = (from.scrollWidth - from.clientWidth) || 1;
+    const ratio = from.scrollLeft / r;
+    const targetMax = (to.scrollWidth - to.clientWidth);
+    to.scrollLeft = ratio * targetMax;
+    // フレーム後にロック解除（相互イベントのループ防止）
+    requestAnimationFrame(()=>{ lock = false; });
+  }
+
+  container.addEventListener('scroll', () => linkScroll(container, footerBar));
+  footerBar.addEventListener('scroll', () => linkScroll(footerBar, container));
+})();
 </script>
 <script>
 if ('serviceWorker' in navigator) {
