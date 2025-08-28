@@ -118,6 +118,9 @@ footer{
 /* フッターが高くなったので、表の下に余白を確保（隠れ防止） */
 .inputs{
   padding-bottom: calc(var(--footer-h) + 24px);
+}.inputs, .footwrap {
+  overscroll-behavior-x: contain;
+  scroll-snap-type: none;
 }
 </style>
 <link rel="manifest" href="manifest.webmanifest">
@@ -379,27 +382,24 @@ elSaveKey?.addEventListener('change', ()=>{
 
 // 起動時に一度計算表示を確実に更新
 products.forEach((_,i)=>updateCalcForCol(i));
-// ===== 表(.inputs) と フッター(.footwrap) の横スクロール連動 =====
-(function syncHorizontalScroll(){
+// ===== 表(.inputs) → フッター(.footwrap) 片方向同期 =====
+(function syncHorizontalScrollOneWay(){
   const container = document.querySelector('.inputs');
   const footerBar = document.querySelector('.footwrap');
-  if(!container || !footerBar) return;
+  if (!container || !footerBar) return;
 
-  let lock = false;
-  function linkScroll(from, to){
-    if(lock) return;
-    lock = true;
-    // スクロール量を割合で同期（幅が違っても追従）
-    const r = (from.scrollWidth - from.clientWidth) || 1;
-    const ratio = from.scrollLeft / r;
-    const targetMax = (to.scrollWidth - to.clientWidth);
-    to.scrollLeft = ratio * targetMax;
-    // フレーム後にロック解除（相互イベントのループ防止）
-    requestAnimationFrame(()=>{ lock = false; });
-  }
+  const EPS = 0.5; // 微小差は無視して慣性を殺さない
 
-  container.addEventListener('scroll', () => linkScroll(container, footerBar));
-  footerBar.addEventListener('scroll', () => linkScroll(footerBar, container));
+  container.addEventListener('scroll', () => {
+    const maxFrom = (container.scrollWidth - container.clientWidth) || 1;
+    const ratio   = container.scrollLeft / maxFrom;
+    const maxTo   = (footerBar.scrollWidth - footerBar.clientWidth);
+
+    const target  = ratio * maxTo;
+    if (Math.abs(footerBar.scrollLeft - target) > EPS) {
+      footerBar.scrollLeft = target;
+    }
+  }, { passive: true });
 })();
 </script>
 <script>
