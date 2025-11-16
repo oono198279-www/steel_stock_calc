@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <link rel="manifest" href="steel-calc.webmanifest">
-  
+
   <!-- iOS ホーム画面用アイコン -->
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
@@ -10,7 +10,8 @@
 
   <meta charset="UTF-8">
   <title>鋼材在庫 → 加工可能個数 計算</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+
   <style>
     :root{
       --bg:#050608;
@@ -167,7 +168,7 @@
       border:1px solid var(--input-border);
       background:var(--input-bg);
       color:var(--input-text);
-      font-size:1rem;           /* ★ ズーム対策：16px相当に統一 */
+      font-size:1rem;           /* 16px 相当：ズーム防止 */
       font-variant-numeric:tabular-nums;
     }
     .input-main:focus{
@@ -350,14 +351,16 @@
       <div class="form-row">
         <div class="form-label">鋼材束重量（kg）</div>
         <div class="form-value">
-          <input id="inputBundleWeight" type="number" inputmode="decimal" class="input-main">
+          <input id="inputBundleWeight" type="text" inputmode="decimal"
+                 class="input-main" autocomplete="off">
         </div>
       </div>
 
       <div class="form-row">
         <div class="form-label">鋼材本数（本）</div>
         <div class="form-value">
-          <input id="inputBundleBars" type="number" inputmode="decimal" class="input-main">
+          <input id="inputBundleBars" type="text" inputmode="numeric"
+                 class="input-main" autocomplete="off">
         </div>
       </div>
 
@@ -414,7 +417,7 @@
 
   const STORAGE_KEY = "steel_calc_v2";
 
-  // 初期値（必要に応じて現場の値に変更OK）
+  // 初期値
   const DEFAULT_PRODUCTS = [
     {
       code: "12-3456",
@@ -435,13 +438,12 @@
   let products = loadProducts();
   let currentIndex = 0;
 
-  // フォーマット
   const fmtInt = (v)=>{
     if(!Number.isFinite(v)) return "0";
     return Math.round(v).toLocaleString("ja-JP");
   };
 
-  // ★ 計算ロジック（指定の式に合わせて修正）
+  // 計算ロジック
   function calc(p){
     const barLength   = +p.barLengthMm || 0;
     const scrap       = +p.scrapLengthMm || 0;
@@ -482,7 +484,6 @@
     }catch(e){
       console.warn("loadProducts error", e);
     }
-    // デフォルトのディープコピー
     return DEFAULT_PRODUCTS.map(p=>({...p}));
   }
 
@@ -509,7 +510,6 @@
     document.getElementById("currentCode").textContent = p.code || "未設定";
     document.getElementById("currentName").textContent = p.name || "製品名 未設定";
 
-    // セレクト
     const sel = document.getElementById("selectProduct");
     sel.innerHTML = "";
     products.forEach((prod,idx)=>{
@@ -520,13 +520,11 @@
     });
     sel.value = String(currentIndex);
 
-    // 入力欄
     document.getElementById("inputBundleWeight").value =
-      (p.bundleWeightKg ?? "") === "" ? "" : (p.bundleWeightKg ?? "");
+      p.bundleWeightKg == null ? "" : String(p.bundleWeightKg);
     document.getElementById("inputBundleBars").value =
-      (p.bundleBarCountFactor ?? "") === "" ? "" : (p.bundleBarCountFactor ?? "");
+      p.bundleBarCountFactor == null ? "" : String(p.bundleBarCountFactor);
 
-    // 出力
     document.getElementById("spanPcsPerBar").textContent = fmtInt(r.pcsPerBar);
     document.getElementById("spanTotalBars").textContent = fmtInt(r.totalBars);
     document.getElementById("spanTotalPcs").textContent = fmtInt(r.totalPcs);
@@ -607,7 +605,6 @@
     const key = input.dataset.key;
     let value = input.value;
 
-    // 数値フィールドは number に変換
     if (input.type === "number" && value !== "") {
       value = +value;
     }
@@ -616,7 +613,6 @@
     saveProducts();
     renderMain();
 
-    // 品番(code)だけヘッダーの表示名も更新する
     if (key === "code") {
       const block = input.closest(".product-block");
       if (block) {
@@ -743,18 +739,30 @@
     renderMain();
   });
 
-  document.getElementById("inputBundleWeight").addEventListener("input",(ev)=>{
+  // 計算結果だけ更新
+  function updateMainOutputs(){
+    const p = products[currentIndex];
+    const r = calc(p);
+    document.getElementById("spanPcsPerBar").textContent = fmtInt(r.pcsPerBar);
+    document.getElementById("spanTotalBars").textContent = fmtInt(r.totalBars);
+    document.getElementById("spanTotalPcs").textContent = fmtInt(r.totalPcs);
+  }
+
+  const inputBundleWeightEl = document.getElementById("inputBundleWeight");
+  const inputBundleBarsEl   = document.getElementById("inputBundleBars");
+
+  inputBundleWeightEl.addEventListener("input",(ev)=>{
     const v = ev.currentTarget.value;
-    products[currentIndex].bundleWeightKg = v===""? "": +v;
+    products[currentIndex].bundleWeightKg = v;   // 文字列のまま保存
     saveProducts();
-    renderMain();
+    updateMainOutputs();
   });
 
-  document.getElementById("inputBundleBars").addEventListener("input",(ev)=>{
+  inputBundleBarsEl.addEventListener("input",(ev)=>{
     const v = ev.currentTarget.value;
-    products[currentIndex].bundleBarCountFactor = v===""? "": +v;
+    products[currentIndex].bundleBarCountFactor = v;
     saveProducts();
-    renderMain();
+    updateMainOutputs();
   });
 
   // 初期描画
