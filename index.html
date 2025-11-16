@@ -1,659 +1,747 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>鋼材在庫 → 加工可能個数 計算</title>
+  <meta charset="UTF-8">
+  <title>鋼材在庫 → 加工可能個数 計算</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    :root{
+      --bg:#050608;
+      --card:#181b20;
+      --card-soft:#22262e;
+      --accent:#08c29e;
+      --accent-soft:#0f9e84;
+      --warn:#f5a623;
+      --text-main:#f5f7fb;
+      --text-sub:#a6acb8;
+      --input-bg:#f5f5f5;
+      --input-border:#c4c8d0;
+      --input-text:#20232a;
+      --border-soft:#303544;
+      --btn-gray:#3a3f4a;
+    }
+    *{box-sizing:border-box;}
+    html,body{
+      margin:0;
+      padding:0;
+      background:radial-gradient(circle at top,#252a36 0,#050608 55%);
+      color:var(--text-main);
+      font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      -webkit-text-size-adjust:100%;
+    }
+    body{
+      padding:12px 10px 40px;
+    }
+    h1{
+      font-size:1.2rem;
+      margin:8px 0 4px;
+    }
+    p{margin:0;}
 
-<style>
-:root{
-  --bg:#0b0c10;
-  --panel:#111318;
-  --ink:#e8eaed;
-  --muted:#9aa0a6;
-  --accent:#6ee7b7;
-  --warn:#fbbf24;
-  --grid:#22262e;
-}
-html,body{height:100%}
-body{
-  margin:0;
-  background:var(--bg);
-  color:var(--ink);
-  font-family:-apple-system,system-ui,"Segoe UI",Roboto,
-    "Hiragino Sans",Meiryo,Arial,sans-serif;
-  display:flex;
-  flex-direction:column;
-  min-height:100vh;
-}
-.wrap{max-width:1200px;margin-inline:auto;padding:20px}
+    .wrapper{
+      max-width:600px;
+      margin:0 auto;
+    }
 
-/* ヘッダ（タイトルだけ） */
-header{
-  position:sticky;
-  top:0;
-  background:linear-gradient(0deg,rgba(11,12,16,.0),rgba(11,12,16,.9));
-  backdrop-filter:blur(6px);
-  z-index:10;
-}
-h1{
-  margin:10px 0 4px;
-  font-size:clamp(20px,2.4vw,26px);
-}
+    .card{
+      background:rgba(10,12,18,.92);
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.06);
+      box-shadow:0 18px 40px rgba(0,0,0,.6);
+      padding:14px 14px 16px;
+      margin-top:10px;
+    }
 
-/* レイアウト */
-.grid{
-  display:grid;
-  gap:16px;
-  grid-template-columns:1fr;
-  flex:1;
-}
-@media (min-width:980px){
-  .grid{grid-template-columns:340px 1fr}
-}
-.card{
-  background:var(--panel);
-  border:1px solid var(--grid);
-  border-radius:16px;
-  padding:16px;
-}
-.card h2{margin:0 0 10px;font-size:18px}
-.small{color:var(--muted);font-size:12px}
+    .card-header{
+      margin-bottom:8px;
+    }
 
-/* 表まわり */
-.inputs{overflow:auto;position:relative;padding-bottom:40px}
-.inputs::after{
-  content:"";
-  position:sticky;
-  left:0;top:0;bottom:0;
-  width:14px;
-  background:var(--panel);
-  z-index:4;
-  pointer-events:none;
-  display:block;
-}
-table{
-  border-collapse:separate;
-  border-spacing:0;
-  width:max-content;
-  min-width:100%;
-  table-layout:fixed;
-}
-thead th{position:sticky;top:0;background:var(--panel);z-index:3}
-th,td{
-  border-bottom:1px solid var(--grid);
-  padding:8px;
-  text-align:left;
-  vertical-align:middle;
-}
-tr:nth-child(even) td{background:rgba(255,255,255,0.02)}
+    .card-header ul{
+      margin:4px 0 0;
+      padding-left:20px;
+      color:var(--text-sub);
+      font-size:.85rem;
+    }
 
-/* 行見出し列 */
-th.rowhead{
-  width:120px;min-width:120px;max-width:120px;
-  font-size:13px;line-height:1.3;
-  white-space:normal;word-break:keep-all;overflow-wrap:anywhere;
-}
-@media (max-width:780px){
-  th.rowhead{
-    width:32vw;min-width:32vw;max-width:32vw;
-    font-size:12px;line-height:1.25;
-  }
-}
-thead th:not(.rowhead),tbody td{min-width:220px}
+    .toolbar-row{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      margin-bottom:8px;
+    }
 
-/* 入力 */
-input[type="text"],input[type="number"]{
-  width:100%;
-  box-sizing:border-box;
-  padding:6px 8px;
-  border-radius:10px;
-  border:1px solid var(--grid);
-  background:#0e1116;
-  color:var(--ink);
-  font-size:15px;
-}
-input[type="number"]::-webkit-outer-spin-button,
-input[type="number"]::-webkit-inner-spin-button{
-  -webkit-appearance:none;margin:0;
-}
+    .btn{
+      border:none;
+      border-radius:10px;
+      padding:6px 10px;
+      font-size:.9rem;
+      line-height:1.3;
+      cursor:pointer;
+      color:#fff;
+      background:var(--btn-gray);
+      box-shadow:0 2px 4px rgba(0,0,0,.4);
+      white-space:nowrap;
+    }
+    .btn:active{
+      transform:translateY(1px);
+      box-shadow:0 1px 2px rgba(0,0,0,.5);
+    }
+    .btn-primary{
+      background:var(--accent);
+    }
+    .btn-primary:hover{
+      background:var(--accent-soft);
+    }
+    .btn-warn{
+      background:var(--warn);
+      color:#111;
+    }
+    .btn-ghost{
+      background:transparent;
+      border:1px solid rgba(255,255,255,.14);
+      color:var(--text-main);
+    }
+    .btn-wide{
+      width:100%;
+      justify-content:center;
+      text-align:center;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+    }
 
-/* 数値表示 */
-.out{
-  font-variant-numeric:tabular-nums;
-  display:flex;
-  gap:6px;
-  align-items:baseline;
-}
-.out .num{
-  font-size:18px;
-  font-weight:700;
-  letter-spacing:.02em;
-}
-.out .unit{
-  font-size:12px;
-  color:var(--muted);
-}
+    /* メインの情報行 */
+    .info-card{
+      background:var(--card-soft);
+      border-radius:12px;
+      border:1px solid var(--border-soft);
+      padding:10px 10px 12px;
+      margin-top:6px;
+    }
+    .info-title{
+      font-size:1.1rem;
+      font-weight:600;
+      margin-bottom:2px;
+    }
+    .info-sub{
+      font-size:.9rem;
+      color:var(--text-sub);
+      margin-bottom:8px;
+    }
 
-/* ボタン */
-.btn{
-  cursor:pointer;
-  appearance:none;
-  border:1px solid var(--grid);
-  background:#0e1116;
-  color:#e8eaed;
-  padding:6px 11px;
-  border-radius:10px;
-  font-size:14px;
-}
-.btn:hover{border-color:#394049}
-.btn.primary{
-  border-color:transparent;
-  background:linear-gradient(135deg,#10b981,#22d3ee);
-  color:#072619;
-  font-weight:700;
-}
-.btn.warn{
-  border-color:transparent;
-  background:linear-gradient(135deg,#f59e0b,#fbbf24);
-  color:#4a2d00;
-  font-weight:700;
-}
-.toolbar{
-  display:flex;
-  flex-wrap:wrap;
-  gap:8px;
-  align-items:center;
-}
-.top-controls{margin-bottom:8px}
+    .form-row{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+      padding:4px 0;
+      border-top:1px solid rgba(255,255,255,.04);
+      font-size:.9rem;
+    }
+    .form-row:first-of-type{
+      border-top:none;
+    }
+    .form-label{
+      flex:0 0 56%;
+      color:var(--text-sub);
+    }
+    .form-value{
+      flex:1;
+      text-align:right;
+    }
+    .form-value span.num{
+      font-variant-numeric:tabular-nums;
+    }
 
-/* 設定モーダル */
-.modal{
-  position:fixed;
-  inset:0;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  z-index:100;
-}
-.modal.hidden{display:none}
-.modal-backdrop{
-  position:absolute;
-  inset:0;
-  background:rgba(0,0,0,0.55);
-}
-.modal-body{
-  position:relative;
-  max-height:90vh;
-  overflow:auto;
-  background:#111318;
-  border-radius:16px;
-  padding:16px;
-  width:min(1000px,96vw);
-  box-shadow:0 18px 40px rgba(0,0,0,.6);
-}
-.modal-body h2{margin:0 0 8px;font-size:18px}
-.settings-container{margin-top:8px;margin-bottom:12px}
-.settings-block{
-  border:1px solid var(--grid);
-  border-radius:12px;
-  padding:10px 10px 12px;
-  margin-bottom:10px;
-}
-.settings-block h3{
-  margin:0 0 6px;
-  font-size:15px;
-}
-.settings-grid{
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
-  gap:8px;
-}
-.settings-field{
-  display:flex;
-  flex-direction:column;
-  font-size:13px;
-}
-.settings-field span.label{
-  margin-bottom:2px;
-  color:var(--muted);
-}
-.settings-block .btn-small{
-  margin-top:8px;
-  font-size:13px;
-  padding:6px 10px;
-}
-</style>
+    .input-main{
+      width:100%;
+      padding:4px 7px;
+      border-radius:8px;
+      border:1px solid var(--input-border);
+      background:var(--input-bg);
+      color:var(--input-text);
+      font-size:.9rem;
+      font-variant-numeric:tabular-nums;
+    }
+    .input-main:focus{
+      outline:none;
+      border-color:var(--accent);
+      box-shadow:0 0 0 2px rgba(8,194,158,.25);
+    }
 
-<!-- PWA 関連 -->
-<link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#0b0c10">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black">
-<meta name="apple-mobile-web-app-title" content="鋼材計算">
-<link rel="apple-touch-icon" href="icons/icon-192.png">
+    select.input-main{
+      padding-right:20px;
+    }
+
+    .readonly{
+      color:var(--text-main);
+    }
+
+    .readonly .form-label{
+      color:var(--text-sub);
+    }
+
+    .readonly .form-value{
+      font-weight:600;
+    }
+
+    /* モーダル */
+    .modal-backdrop{
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,.55);
+      z-index:20;
+      opacity:0;
+      pointer-events:none;
+      transition:opacity .15s ease-out;
+    }
+    .modal{
+      position:fixed;
+      inset:0;
+      display:flex;
+      align-items:flex-start;
+      justify-content:center;
+      padding:18px 8px 24px;
+      z-index:30;
+      pointer-events:none;
+      opacity:0;
+      transition:opacity .15s ease-out;
+    }
+    .modal.show,
+    .modal-backdrop.show{
+      opacity:1;
+      pointer-events:auto;
+    }
+    .modal-content{
+      width:100%;
+      max-width:640px;
+      max-height:100%;
+      overflow:auto;
+      background:var(--card);
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.1);
+      padding:12px 12px 14px;
+      box-shadow:0 20px 45px rgba(0,0,0,.7);
+    }
+    .modal-title{
+      font-size:1rem;
+      font-weight:600;
+      margin-bottom:6px;
+    }
+    .modal-desc{
+      font-size:.82rem;
+      color:var(--text-sub);
+      margin-bottom:8px;
+    }
+
+    .product-block{
+      border-radius:10px;
+      border:1px solid var(--border-soft);
+      padding:8px;
+      margin-top:8px;
+      background:#151821;
+    }
+    .product-header{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      margin-bottom:4px;
+    }
+    .product-name{
+      font-weight:600;
+      font-size:.95rem;
+    }
+
+    .grid-2{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:4px 8px;
+      margin-top:4px;
+    }
+    .field-label{
+      font-size:.78rem;
+      color:var(--text-sub);
+      margin-bottom:1px;
+    }
+    .field-group{
+      margin-bottom:4px;
+    }
+    .field-group.full{
+      grid-column:1 / span 2;
+    }
+
+    .modal-footer{
+      margin-top:10px;
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      justify-content:flex-end;
+    }
+
+    .btn-close{
+      background:var(--btn-gray);
+      color:#fff;
+      font-weight:600;
+      min-width:80px;
+    }
+
+    .btn-delete{
+      margin-top:6px;
+      border-radius:8px;
+      padding:4px 8px;
+      font-size:.8rem;
+      border:none;
+      background:var(--warn);
+      color:#111;
+      cursor:pointer;
+    }
+    .btn-delete:active{
+      transform:translateY(1px);
+    }
+
+    @media (max-width:480px){
+      .form-label{flex-basis:58%;}
+      .grid-2{grid-template-columns:1fr 1fr;}
+    }
+  </style>
 </head>
 <body>
-<header>
-  <div class="wrap">
-    <h1>鋼材在庫 → 加工可能個数 計算</h1>
+<div class="wrapper">
+
+  <!-- 説明カード -->
+  <div class="card">
+    <div class="card-header">
+      <h1>鋼材在庫 → 加工可能個数 計算</h1>
+      <ul>
+        <li>通常画面では「鋼材束重量（kg）」と「鋼材本数（本）」だけ入力します。</li>
+        <li>品番・製品全長・SC長さなどは「全品番の設定」から編集します。</li>
+        <li>1本あたりの生産数・鋼材本数合計・加工可能個数は自動計算されます。</li>
+      </ul>
+    </div>
   </div>
-</header>
 
-<div class="wrap grid">
-  <section class="card">
-    <h2>簡単な説明</h2>
-    <ol class="small">
-      <li>通常画面では「鋼材束重量（kg）」と「鋼材本数（本）」だけ入力します。</li>
-      <li>品番・製品全長・SC長さなどは「全品番の設定」から編集します。</li>
-      <li>1本あたりの生産数・鋼材本数合計・加工可能個数は自動計算されます。</li>
-    </ol>
-  </section>
-
-  <section class="card inputs">
-    <div class="toolbar top-controls">
-      <button class="btn" id="btnSaveJson">設定をJSONで保存</button>
-      <button class="btn" id="btnLoadJson">JSONから復元</button>
-      <button class="btn primary" id="btnOpenSettings">全品番の設定</button>
+  <!-- メインカード -->
+  <div class="card" id="mainCard">
+    <div class="toolbar-row">
+      <button class="btn btn-ghost" id="btnExportJson">設定をJSONで保存</button>
+      <button class="btn btn-ghost" id="btnImportJson">JSONから復元</button>
     </div>
 
-    <table id="t">
-      <thead>
-        <tr>
-          <!-- 左上は空欄にして「項目」を非表示にする -->
-          <th class="rowhead"></th>
-          <th>品番A</th>
-          <th>品番B</th>
-        </tr>
-      </thead>
-      <tbody id="tbody"></tbody>
-    </table>
-  </section>
+    <button class="btn btn-primary btn-wide" id="btnOpenSettings">全品番の設定</button>
+
+    <div class="info-card" id="currentInfo">
+      <div class="info-title" id="currentCode">---</div>
+      <div class="info-sub" id="currentName">---</div>
+
+      <div class="form-row">
+        <div class="form-label">表示中の品番</div>
+        <div class="form-value">
+          <select id="selectProduct" class="input-main"></select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-label">鋼材束重量（kg）</div>
+        <div class="form-value">
+          <input id="inputBundleWeight" type="number" inputmode="decimal" class="input-main">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-label">鋼材本数（本）</div>
+        <div class="form-value">
+          <input id="inputBundleBars" type="number" inputmode="decimal" class="input-main">
+        </div>
+      </div>
+
+      <div class="form-row readonly">
+        <div class="form-label">鋼材1本あたりの生産数</div>
+        <div class="form-value">
+          <span id="spanPcsPerBar" class="num">0</span> 個/本
+        </div>
+      </div>
+
+      <div class="form-row readonly">
+        <div class="form-label">鋼材本数合計</div>
+        <div class="form-value">
+          <span id="spanTotalBars" class="num">0</span> 本
+        </div>
+      </div>
+
+      <div class="form-row readonly">
+        <div class="form-label">加工可能個数</div>
+        <div class="form-value">
+          <span id="spanTotalPcs" class="num">0</span> 個
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
+<!-- モーダルの背景 -->
+<div class="modal-backdrop" id="modalBackdrop"></div>
+
 <!-- 設定モーダル -->
-<div class="modal hidden" id="settingsModal">
-  <div class="modal-backdrop"></div>
-  <div class="modal-body">
-    <h2>品番ごとの詳細設定</h2>
-    <p class="small">
-      ここで品番・製品名・鋼材単重・SC長さなどを編集します。
-      「鋼材束重量（kg）」「鋼材本数（本）」は通常画面側からも変更できます。
-    </p>
-    <div class="settings-container" id="settingsContainer"></div>
-    <div class="toolbar" style="margin-top:8px">
-      <button class="btn primary" id="addCol">＋ 品番を追加</button>
-      <button class="btn" id="saveNow">手動保存</button>
-      <button class="btn warn" id="resetAllModal">全消去（初期値に戻す）</button>
-      <button class="btn" id="closeSettings">閉じる</button>
+<div class="modal" id="settingsModal">
+  <div class="modal-content">
+    <div class="modal-title">全品番の設定</div>
+    <div class="modal-desc">
+      品番ごとの寸法・条件を編集します。<br>
+      ※鋼材束重量・鋼材本数（本）は通常画面からも編集できます。
+    </div>
+
+    <div id="productsContainer"></div>
+
+    <div class="modal-footer">
+      <button class="btn btn-primary" id="btnAddProduct">＋ 品番を追加</button>
+      <button class="btn btn-warn" id="btnResetAll">全消去（初期値に戻す）</button>
+      <button class="btn btn-close" id="btnCloseSettings">閉じる</button>
     </div>
   </div>
 </div>
 
 <script>
-/* ==== 初期データ ==== */
-const initialProducts=[
- {"品番":"12-3456","製品名":"ﾌﾟﾗｸﾞ","鋼材束重量":277,"鋼材本数(本数)":5,"鋼材単重":3.09,"鋼材長さ(mm)":3000,"端材長さ(mm)":255,"ｼｮｰﾄｶｯﾄ長さ(mm)":20,"製品全長(mm)":21,"突切厚み(mm)":2,"メイン側端面取代":0.1,"バック側端面取代":0.1},
- {"品番":"09-8765","製品名":"ｼﾞｬｯｸ","鋼材束重量":244,"鋼材本数(本数)":9,"鋼材単重":3.09,"鋼材長さ(mm)":3000,"端材長さ(mm)":262.5,"ｼｮｰﾄｶｯﾄ長さ(mm)":20,"製品全長(mm)":22,"突切厚み(mm)":2,"メイン側端面取代":0.1,"バック側端面取代":0.1}
-];
+(function(){
+  "use strict";
 
-/* 通常画面に出す行（7行） */
-const mainRows=[
- {type:"display", key:"品番", label:"品番"},
- {type:"display", key:"製品名", label:"製品名"},
- {type:"input",   key:"鋼材束重量",     label:"鋼材束重量（kg）",     step:"0.01"},
- {type:"input",   key:"鋼材本数(本数)", label:"鋼材本数（本）",       step:"1"},
- {type:"calc",    calcKey:"pcsPerBar",  label:"鋼材1本あたりの生産数", unit:"個/本"},
- {type:"calc",    calcKey:"totalBars",  label:"鋼材本数合計",         unit:"本"},
- {type:"calc",    calcKey:"totalPcs",   label:"加工可能個数",         unit:"個"}
-];
+  const STORAGE_KEY = "steel_calc_v2";
 
-/* 設定モーダルで編集する項目（13項目） */
-const settingsRows=[
- {key:"品番",label:"品番",type:"text"},
- {key:"製品名",label:"製品名",type:"text"},
- {key:"鋼材単重",label:"鋼材単重",unit:"kg",step:"0.01",type:"number"},
- {key:"鋼材長さ(mm)",label:"鋼材長さ",unit:"mm",step:"0.1",type:"number"},
- {key:"端材長さ(mm)",label:"端材長さ",unit:"mm",step:"0.1",type:"number"},
- {key:"ｼｮｰﾄｶｯﾄ長さ(mm)",label:"ｼｮｰﾄｶｯﾄ長さ",unit:"mm",step:"0.1",type:"number"},
- {key:"製品全長(mm)",label:"製品全長",unit:"mm",step:"0.1",type:"number"},
- {key:"突切厚み(mm)",label:"突切厚み",unit:"mm",step:"0.1",type:"number"},
- {key:"メイン側端面取代",label:"メイン側端面取代",unit:"mm",step:"0.01",type:"number"},
- {key:"バック側端面取代",label:"バック側端面取代",unit:"mm",step:"0.01",type:"number"},
- {key:"鋼材束重量",label:"鋼材束重量",unit:"kg",step:"0.01",type:"number"},
- {key:"鋼材本数(本数)",label:"鋼材本数",unit:"本",step:"1",type:"number"},
- {key:"_dummy",label:"（削除ボタン用）",dummy:true}
-];
-
-const elTable=document.getElementById('t');
-const elTbody=document.getElementById('tbody');
-
-const btnSaveJson=document.getElementById('btnSaveJson');
-const btnLoadJson=document.getElementById('btnLoadJson');
-const btnOpenSettings=document.getElementById('btnOpenSettings');
-
-const modal=document.getElementById('settingsModal');
-const settingsContainer=document.getElementById('settingsContainer');
-const btnCloseSettings=document.getElementById('closeSettings');
-const btnAddCol=document.getElementById('addCol');
-const btnSaveNow=document.getElementById('saveNow');
-const btnResetModal=document.getElementById('resetAllModal');
-
-/* localStorage key は固定 */
-const STORE_KEY="steel-calc-v1";
-
-function loadData(){
-  try{
-    const raw=localStorage.getItem(STORE_KEY);
-    if(!raw) return structuredClone(initialProducts);
-    const arr=JSON.parse(raw);
-    if(!Array.isArray(arr)||arr.length===0) return structuredClone(initialProducts);
-    return arr;
-  }catch(e){
-    console.warn('load failed',e);
-    return structuredClone(initialProducts);
-  }
-}
-function saveData(){
-  try{
-    localStorage.setItem(STORE_KEY, JSON.stringify(products));
-  }catch(e){
-    console.warn('save failed',e);
-  }
-}
-
-/* 計算ロジック */
-function calcValues(p){
-  const n=v=>isFinite(+v)?+v:0;
-  const L=n(p["鋼材長さ(mm)"]),
-        off=n(p["端材長さ(mm)"]),
-        sc=n(p["ｼｮｰﾄｶｯﾄ長さ(mm)"]);
-  const part=n(p["製品全長(mm)"]),
-        cut=n(p["突切厚み(mm)"]),
-        fm=n(p["メイン側端面取代"]),
-        fb=n(p["バック側端面取代"]);
-  const feedPer=part+cut+fm+fb;
-  const usable=L-off-sc;
-  const pcsPerBar = feedPer>0 ? Math.floor(usable/feedPer) : 0;
-
-  const bundleKg=n(p["鋼材束重量"]),
-        unitKg=n(p["鋼材単重"]),
-        countBars=n(p["鋼材本数(本数)"]);
-  const barsFromKg = unitKg>0 ? Math.floor(bundleKg/unitKg) : 0;
-  const totalBars = barsFromKg + countBars;
-  const totalPcs  = pcsPerBar * totalBars;
-
-  return {pcsPerBar,totalBars,totalPcs};
-}
-const fmtInt=n=>(isFinite(+n)?Math.floor(+n):0).toLocaleString();
-
-/* テーブル全体の描画 */
-function syncHeaderCols(){
-  const theadRow=elTable.querySelector('thead tr');
-  while(theadRow.children.length<products.length+1){
-    const th=document.createElement('th');
-    th.textContent=`品番${String.fromCharCode(65+(theadRow.children.length-1))}`;
-    theadRow.appendChild(th);
-  }
-  while(theadRow.children.length>products.length+1){
-    theadRow.removeChild(theadRow.lastElementChild);
-  }
-  // 見出し名を品番で上書き
-  products.forEach((p,i)=>{
-    const th=theadRow.children[i+1];
-    if(th) th.textContent=p["品番"]||`品番${String.fromCharCode(65+i)}`;
-  });
-}
-
-function render(){
-  syncHeaderCols();
-  elTbody.innerHTML='';
-
-  mainRows.forEach(row=>{
-    const tr=document.createElement('tr');
-    const th=document.createElement('th');
-    th.className='rowhead';
-    th.textContent=row.label;
-    tr.appendChild(th);
-
-    products.forEach((p,colIdx)=>{
-      const td=document.createElement('td');
-
-      if(row.type==="display"){
-        const span=document.createElement('span');
-        span.textContent=(p[row.key]??"").toString();
-        td.appendChild(span);
-
-      }else if(row.type==="input"){
-        const inp=document.createElement('input');
-        inp.type='number';
-        if(row.step) inp.step=row.step;
-        inp.value=p[row.key] ?? '';
-        inp.dataset.key=row.key;
-        inp.dataset.col=colIdx;
-        inp.addEventListener('input',ev=>{
-          const key=ev.currentTarget.dataset.key;
-          const i=+ev.currentTarget.dataset.col;
-          const v=ev.currentTarget.value===''?'':+ev.currentTarget.value;
-          products[i][key]=v;
-          saveData();
-          updateCalcCellsForCol(i);
-        });
-        td.appendChild(inp);
-
-      }else if(row.type==="calc"){
-        const r=calcValues(p);
-        const val = row.calcKey==="pcsPerBar" ? r.pcsPerBar :
-                    row.calcKey==="totalBars" ? r.totalBars :
-                    r.totalPcs;
-        const div=document.createElement('div');
-        div.className='out';
-        const num=document.createElement('span');
-        num.className='num';
-        num.dataset.calc=row.calcKey;
-        num.dataset.col=colIdx;
-        num.textContent=fmtInt(val);
-        div.appendChild(num);
-        if(row.unit){
-          const u=document.createElement('span');
-          u.className='unit';
-          u.textContent=row.unit;
-          div.appendChild(u);
-        }
-        td.appendChild(div);
-      }
-
-      tr.appendChild(td);
-    });
-
-    elTbody.appendChild(tr);
-  });
-}
-
-/* 1列分の計算セルだけ更新 */
-function updateCalcCellsForCol(i){
-  const p=products[i];
-  const r=calcValues(p);
-  const map={
-    pcsPerBar:r.pcsPerBar,
-    totalBars:r.totalBars,
-    totalPcs:r.totalPcs
-  };
-  Object.entries(map).forEach(([key,val])=>{
-    const span=document.querySelector(`span[data-calc="${key}"][data-col="${i}"]`);
-    if(span) span.textContent=fmtInt(val);
-  });
-}
-
-/* 設定モーダル描画 */
-function renderSettings(){
-  settingsContainer.innerHTML='';
-  products.forEach((p,i)=>{
-    const block=document.createElement('div');
-    block.className='settings-block';
-
-    const h3=document.createElement('h3');
-    h3.textContent=p["品番"]||`品番${String.fromCharCode(65+i)}`;
-    block.appendChild(h3);
-
-    const grid=document.createElement('div');
-    grid.className='settings-grid';
-
-    settingsRows.forEach(row=>{
-      if(row.dummy) return;
-      const field=document.createElement('label');
-      field.className='settings-field';
-
-      const lab=document.createElement('span');
-      lab.className='label';
-      lab.textContent=row.label+(row.unit?` (${row.unit})`:'');
-      const inp=document.createElement('input');
-      inp.type=row.type||'text';
-      if(row.step) inp.step=row.step;
-      inp.value=p[row.key] ?? '';
-      inp.addEventListener('input',ev=>{
-        const v = ev.currentTarget.type==='number'
-          ? (ev.currentTarget.value===''?'':+ev.currentTarget.value)
-          : ev.currentTarget.value;
-        products[i][row.key]=v;
-        saveData();
-        // 品番・製品名・束重量・本数は通常画面にも反映
-        if(row.key==="品番" || row.key==="製品名" ||
-           row.key==="鋼材束重量" || row.key==="鋼材本数(本数)"){
-          render();
-        }else{
-          updateCalcCellsForCol(i);
-        }
-      });
-
-      field.appendChild(lab);
-      field.appendChild(inp);
-      grid.appendChild(field);
-    });
-
-    block.appendChild(grid);
-
-    const delBtn=document.createElement('button');
-    delBtn.className='btn btn-small warn';
-    delBtn.textContent='この品番を削除';
-    delBtn.onclick=()=>deleteProduct(i);
-    block.appendChild(delBtn);
-
-    settingsContainer.appendChild(block);
-  });
-}
-
-/* 品番追加・削除・リセット */
-function deleteProduct(i){
-  if(products.length<=1){
-    alert('少なくとも1列は必要です');
-    return;
-  }
-  products.splice(i,1);
-  saveData();
-  render();
-  if(!modal.classList.contains('hidden')) renderSettings();
-}
-function resetToInitial(){
-  if(!confirm('ローカル保存を削除して初期値に戻します。よろしいですか？')) return;
-  localStorage.removeItem(STORE_KEY);
-  products=structuredClone(initialProducts);
-  render();
-  if(!modal.classList.contains('hidden')) renderSettings();
-}
-
-/* ==== 状態 ==== */
-let products=loadData();
-render();
-
-/* ==== イベントいろいろ ==== */
-btnOpenSettings.onclick=()=>{
-  renderSettings();
-  modal.classList.remove('hidden');
-};
-btnCloseSettings.onclick=()=>modal.classList.add('hidden');
-modal.addEventListener('click',e=>{
-  if(e.target.classList.contains('modal-backdrop')){
-    modal.classList.add('hidden');
-  }
-});
-
-btnAddCol.onclick=()=>{
-  const blank={};
-  settingsRows.forEach(r=>{
-    if(r.dummy) return;
-    blank[r.key]= (r.type==='number') ? 0 : '';
-  });
-  blank["品番"]=`NEW-${Math.random().toString(36).slice(2,6).toUpperCase()}`;
-  products.push(blank);
-  saveData();
-  render();
-  if(!modal.classList.contains('hidden')) renderSettings();
-};
-btnSaveNow.onclick=saveData;
-btnResetModal.onclick=resetToInitial;
-
-/* ==== JSON保存・復元 ==== */
-const jsonFileInput=document.createElement('input');
-jsonFileInput.type='file';
-jsonFileInput.accept='application/json';
-jsonFileInput.style.display='none';
-document.body.appendChild(jsonFileInput);
-
-btnSaveJson.onclick=()=>{
-  const payload={
-    version:"steel-calc-config-v1",
-    savedAt:new Date().toISOString(),
-    products
-  };
-  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
-  const a=document.createElement('a');
-  const d=new Date();
-  const pad=n=>String(n).padStart(2,'0');
-  const fname=
-    `鋼材計算_backup_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}`+
-    `_${pad(d.getHours())}${pad(d.getMinutes())}.json`;
-  a.href=URL.createObjectURL(blob);
-  a.download=fname;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(a.href);
-};
-
-btnLoadJson.onclick=()=>jsonFileInput.click();
-
-jsonFileInput.addEventListener('change',async ev=>{
-  const file=ev.target.files?.[0];
-  if(!file) return;
-  try{
-    const text=await file.text();
-    const data=JSON.parse(text);
-    const arr=Array.isArray(data.products)?data.products:
-              (Array.isArray(data)?data:null);
-    if(!arr){
-      alert('JSONの形式が想定と違います');
-      return;
+  // 初期値（仮の値なので、現場の値に合わせて書き換えてOK）
+  const DEFAULT_PRODUCTS = [
+    {
+      code: "12-3456",
+      name: "プラグ",
+      steelUnitWeightKgPerM: 3.56,   // 鋼材単重（kg/m）
+      barLengthMm: 3000,             // 鋼材長さ（mm）
+      scrapLengthMm: 0,              // 端材長さ（mm）
+      shortCutLengthMm: 0,           // ｼｮｰﾄｶｯﾄ長さ（mm）
+      partLengthMm: 21,              // 製品全長（mm）
+      cutoffThicknessMm: 2,          // 突切厚み（mm）
+      allowFrontMm: 0.1,             // メイン側端面取代（mm）
+      allowBackMm: 0.1,              // バック側端面取代（mm）
+      bundleWeightKg: 277,           // 鋼材束重量（kg）
+      bundleBarCountFactor: 5        // 鋼材本数（本）※本数係数
     }
-    products=arr;
-    saveData();
-    render();
-    if(!modal.classList.contains('hidden')) renderSettings();
-    alert('JSONから設定を復元しました。');
-  }catch(e){
-    console.error(e);
-    alert('JSONの読み込みに失敗しました。');
-  }finally{
-    jsonFileInput.value='';
-  }
-});
+  ];
 
-/* ==== PWA用 Service Worker 登録 ==== */
-if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('./sw.js').catch(console.error);
+  let products = loadProducts();
+  let currentIndex = 0;
+
+  // フォーマット
+  const fmtInt = (v)=>{
+    if(!Number.isFinite(v)) return "0";
+    return Math.round(v).toLocaleString("ja-JP");
+  };
+
+  // 計算ロジック
+  function calc(p){
+    const barLength = +p.barLengthMm || 0;
+    const scrap = +p.scrapLengthMm || 0;
+    const shortCut = +p.shortCutLengthMm || 0;
+    const allowF = +p.allowFrontMm || 0;
+    const allowB = +p.allowBackMm || 0;
+    const unitW = +p.steelUnitWeightKgPerM || 0;
+    const partL = +p.partLengthMm || 0;
+    const cutT = +p.cutoffThicknessMm || 0;
+    const bundleW = +p.bundleWeightKg || 0;
+    const bundleFactor = +p.bundleBarCountFactor || 0;
+
+    // 有効長さ
+    const usable = Math.max(0, barLength - scrap - shortCut);
+    const effective = Math.max(0, usable - allowF - allowB);
+    const pitch = partL + cutT;
+
+    const pcsPerBar = pitch > 0 ? Math.floor(effective / pitch) : 0;
+
+    const weightPerBar = unitW * barLength / 1000; // kg
+    const barsFromWeight = weightPerBar > 0 ? bundleW / weightPerBar : 0;
+    const totalBars = barsFromWeight * bundleFactor;
+    const totalPcs = pcsPerBar * totalBars;
+
+    return { pcsPerBar, totalBars, totalPcs };
+  }
+
+  // localStorage 読み込み
+  function loadProducts(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(raw){
+        const obj = JSON.parse(raw);
+        if(Array.isArray(obj.products) && obj.products.length){
+          return obj.products;
+        }
+      }
+    }catch(e){
+      console.warn("loadProducts error", e);
+    }
+    // デフォルトのディープコピー
+    return DEFAULT_PRODUCTS.map(p=>({...p}));
+  }
+
+  function saveProducts(){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({products}));
+    }catch(e){
+      console.warn("saveProducts error", e);
+    }
+  }
+
+  // メイン画面の描画
+  function renderMain(){
+    if(products.length === 0){
+      products = DEFAULT_PRODUCTS.map(p=>({...p}));
+      currentIndex = 0;
+    }
+    if(currentIndex >= products.length) currentIndex = products.length-1;
+    if(currentIndex < 0) currentIndex = 0;
+
+    const p = products[currentIndex];
+    const r = calc(p);
+
+    document.getElementById("currentCode").textContent = p.code || "未設定";
+    document.getElementById("currentName").textContent = p.name || "製品名 未設定";
+
+    // セレクト
+    const sel = document.getElementById("selectProduct");
+    sel.innerHTML = "";
+    products.forEach((prod,idx)=>{
+      const opt = document.createElement("option");
+      opt.value = idx;
+      opt.textContent = prod.code || `品番${idx+1}`;
+      sel.appendChild(opt);
+    });
+    sel.value = String(currentIndex);
+
+    // 入力欄
+    document.getElementById("inputBundleWeight").value =
+      (p.bundleWeightKg ?? "") === "" ? "" : (p.bundleWeightKg ?? "");
+    document.getElementById("inputBundleBars").value =
+      (p.bundleBarCountFactor ?? "") === "" ? "" : (p.bundleBarCountFactor ?? "");
+
+    // 出力
+    document.getElementById("spanPcsPerBar").textContent = fmtInt(r.pcsPerBar);
+    document.getElementById("spanTotalBars").textContent = fmtInt(r.totalBars);
+    document.getElementById("spanTotalPcs").textContent = fmtInt(r.totalPcs);
+  }
+
+  // 設定モーダル描画
+  function renderSettings(){
+    const container = document.getElementById("productsContainer");
+    container.innerHTML = "";
+
+    products.forEach((p,idx)=>{
+      const block = document.createElement("div");
+      block.className = "product-block";
+      block.dataset.index = idx;
+
+      const header = document.createElement("div");
+      header.className = "product-header";
+      const title = document.createElement("div");
+      title.className = "product-name";
+      title.textContent = p.code || `品番${idx+1}`;
+      header.appendChild(title);
+      block.appendChild(header);
+
+      const grid = document.createElement("div");
+      grid.className = "grid-2";
+
+      const addField = (label,key,full=false)=>{
+        const wrap = document.createElement("div");
+        wrap.className = "field-group" + (full?" full":"");
+        const lb = document.createElement("div");
+        lb.className = "field-label";
+        lb.textContent = label;
+        const input = document.createElement("input");
+        input.className = "input-main";
+        input.dataset.key = key;
+        input.dataset.index = idx;
+        input.value = p[key] ?? "";
+        if(/KgPerM|LengthMm|Mm$|WeightKg|Factor/.test(key)){
+          input.type = "number";
+          input.inputMode = "decimal";
+        }else{
+          input.type = "text";
+        }
+        input.addEventListener("input", onSettingsInput);
+        wrap.appendChild(lb);
+        wrap.appendChild(input);
+        grid.appendChild(wrap);
+      };
+
+      addField("品番","code",true);
+      addField("製品名","name",true);
+      addField("鋼材単重（kg/m）","steelUnitWeightKgPerM");
+      addField("鋼材長さ（mm）","barLengthMm");
+      addField("端材長さ（mm）","scrapLengthMm");
+      addField("ｼｮｰﾄｶｯﾄ長さ（mm）","shortCutLengthMm");
+      addField("製品全長（mm）","partLengthMm");
+      addField("突切厚み（mm）","cutoffThicknessMm");
+      addField("メイン側端面取代（mm）","allowFrontMm");
+      addField("バック側端面取代（mm）","allowBackMm");
+      addField("鋼材束重量（kg）","bundleWeightKg");
+      addField("鋼材本数（本）","bundleBarCountFactor");
+
+      block.appendChild(grid);
+
+      const delBtn = document.createElement("button");
+      delBtn.className = "btn-delete";
+      delBtn.textContent = "この品番を削除";
+      delBtn.addEventListener("click", ()=>deleteProduct(idx));
+      block.appendChild(delBtn);
+
+      container.appendChild(block);
+    });
+  }
+
+  function onSettingsInput(ev){
+    const input = ev.currentTarget;
+    const idx = +input.dataset.index;
+    const key = input.dataset.key;
+    let value = input.value;
+    if(input.type === "number" && value !== ""){
+      value = +value;
+    }
+    products[idx][key] = value;
+    saveProducts();
+    renderMain();
+    // タイトルの表示更新
+    renderSettings();
+  }
+
+  function deleteProduct(idx){
+    if(!confirm("この品番を削除しますか？")) return;
+    products.splice(idx,1);
+    if(products.length===0){
+      products = DEFAULT_PRODUCTS.map(p=>({...p}));
+    }
+    if(currentIndex>=products.length) currentIndex = products.length-1;
+    saveProducts();
+    renderMain();
+    renderSettings();
+  }
+
+  // JSON エクスポート
+  function exportJson(){
+    const data = {
+      exportedAt: new Date().toISOString(),
+      products
+    };
+    const blob = new Blob([JSON.stringify(data,null,2)], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "鋼材計算_backup.json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  // JSON インポート
+  function importJson(){
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "application/json,.json";
+    input.addEventListener("change",()=>{
+      const file = input.files && input.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = ()=>{
+        try{
+          const obj = JSON.parse(reader.result);
+          if(Array.isArray(obj.products)){
+            products = obj.products;
+          }else if(Array.isArray(obj)){
+            products = obj;
+          }else{
+            alert("JSONの形式が違うようです。");
+            return;
+          }
+          currentIndex = 0;
+          saveProducts();
+          renderMain();
+          renderSettings();
+        }catch(e){
+          console.error(e);
+          alert("JSONの読み込みに失敗しました。");
+        }
+      };
+      reader.readAsText(file,"utf-8");
+    });
+    input.click();
+  }
+
+  function openSettings(){
+    document.getElementById("settingsModal").classList.add("show");
+    document.getElementById("modalBackdrop").classList.add("show");
+    renderSettings();
+  }
+  function closeSettings(){
+    document.getElementById("settingsModal").classList.remove("show");
+    document.getElementById("modalBackdrop").classList.remove("show");
+  }
+
+  function resetAll(){
+    if(!confirm("全ての設定を初期値に戻しますか？")) return;
+    products = DEFAULT_PRODUCTS.map(p=>({...p}));
+    currentIndex = 0;
+    saveProducts();
+    renderMain();
+    renderSettings();
+  }
+
+  // イベント設定
+  document.getElementById("btnExportJson").addEventListener("click", exportJson);
+  document.getElementById("btnImportJson").addEventListener("click", importJson);
+  document.getElementById("btnOpenSettings").addEventListener("click", openSettings);
+  document.getElementById("btnCloseSettings").addEventListener("click", closeSettings);
+  document.getElementById("modalBackdrop").addEventListener("click", closeSettings);
+  document.getElementById("btnAddProduct").addEventListener("click", ()=>{
+    products.push({
+      code:"",
+      name:"",
+      steelUnitWeightKgPerM:0,
+      barLengthMm:0,
+      scrapLengthMm:0,
+      shortCutLengthMm:0,
+      partLengthMm:0,
+      cutoffThicknessMm:0,
+      allowFrontMm:0,
+      allowBackMm:0,
+      bundleWeightKg:0,
+      bundleBarCountFactor:0
+    });
+    currentIndex = products.length-1;
+    saveProducts();
+    renderMain();
+    renderSettings();
   });
-}
+  document.getElementById("btnResetAll").addEventListener("click", resetAll);
+
+  document.getElementById("selectProduct").addEventListener("change",(ev)=>{
+    currentIndex = +ev.target.value || 0;
+    renderMain();
+  });
+
+  document.getElementById("inputBundleWeight").addEventListener("input",(ev)=>{
+    const v = ev.currentTarget.value;
+    products[currentIndex].bundleWeightKg = v===""? "": +v;
+    saveProducts();
+    renderMain();
+  });
+
+  document.getElementById("inputBundleBars").addEventListener("input",(ev)=>{
+    const v = ev.currentTarget.value;
+    products[currentIndex].bundleBarCountFactor = v===""? "": +v;
+    saveProducts();
+    renderMain();
+  });
+
+  // 初期描画
+  renderMain();
+
+})();
 </script>
 </body>
 </html>
