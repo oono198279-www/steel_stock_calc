@@ -167,7 +167,7 @@
       border:1px solid var(--input-border);
       background:var(--input-bg);
       color:var(--input-text);
-      font-size:.9rem;
+      font-size:1rem;           /* ★ ズーム対策：16px相当に統一 */
       font-variant-numeric:tabular-nums;
     }
     .input-main:focus{
@@ -414,7 +414,7 @@
 
   const STORAGE_KEY = "steel_calc_v2";
 
-  // 初期値（仮の値なので、現場の値に合わせて書き換えてOK）
+  // 初期値（必要に応じて現場の値に変更OK）
   const DEFAULT_PRODUCTS = [
     {
       code: "12-3456",
@@ -428,7 +428,7 @@
       allowFrontMm: 0.1,             // メイン側端面取代（mm）
       allowBackMm: 0.1,              // バック側端面取代（mm）
       bundleWeightKg: 277,           // 鋼材束重量（kg）
-      bundleBarCountFactor: 5        // 鋼材本数（本）※本数係数
+      bundleBarCountFactor: 5        // 鋼材本数（本）
     }
   ];
 
@@ -441,29 +441,29 @@
     return Math.round(v).toLocaleString("ja-JP");
   };
 
-  // 計算ロジック
+  // ★ 計算ロジック（指定の式に合わせて修正）
   function calc(p){
-    const barLength = +p.barLengthMm || 0;
-    const scrap = +p.scrapLengthMm || 0;
-    const shortCut = +p.shortCutLengthMm || 0;
-    const allowF = +p.allowFrontMm || 0;
-    const allowB = +p.allowBackMm || 0;
-    const unitW = +p.steelUnitWeightKgPerM || 0;
-    const partL = +p.partLengthMm || 0;
-    const cutT = +p.cutoffThicknessMm || 0;
-    const bundleW = +p.bundleWeightKg || 0;
-    const bundleFactor = +p.bundleBarCountFactor || 0;
+    const barLength   = +p.barLengthMm || 0;
+    const scrap       = +p.scrapLengthMm || 0;
+    const shortCut    = +p.shortCutLengthMm || 0;
+    const allowF      = +p.allowFrontMm || 0;
+    const allowB      = +p.allowBackMm || 0;
+    const unitW       = +p.steelUnitWeightKgPerM || 0;   // kg/m
+    const partL       = +p.partLengthMm || 0;
+    const cutT        = +p.cutoffThicknessMm || 0;
+    const bundleW     = +p.bundleWeightKg || 0;          // kg
+    const bundleBars  = +p.bundleBarCountFactor || 0;    // 本
 
-    // 有効長さ
-    const usable = Math.max(0, barLength - scrap - shortCut);
-    const effective = Math.max(0, usable - allowF - allowB);
-    const pitch = partL + cutT;
+    // 鋼材1本あたりの生産数
+    const usableLen = Math.max(0, barLength - scrap - shortCut);
+    const pitchLen  = partL + cutT + allowF + allowB;
+    const pcsPerBar = pitchLen > 0 ? Math.floor(usableLen / pitchLen) : 0;
 
-    const pcsPerBar = pitch > 0 ? Math.floor(effective / pitch) : 0;
+    // 鋼材本数合計 = QUOTIENT(束重量, 単重) + 鋼材本数
+    const barsFromWeight = unitW > 0 ? Math.floor(bundleW / unitW) : 0;
+    const totalBars      = barsFromWeight + bundleBars;
 
-    const weightPerBar = unitW * barLength / 1000; // kg
-    const barsFromWeight = weightPerBar > 0 ? bundleW / weightPerBar : 0;
-    const totalBars = barsFromWeight * bundleFactor;
+    // 加工可能個数
     const totalPcs = pcsPerBar * totalBars;
 
     return { pcsPerBar, totalBars, totalPcs };
@@ -600,6 +600,7 @@
       container.appendChild(block);
     });
   }
+
   function onSettingsInput(ev){
     const input = ev.currentTarget;
     const idx = +input.dataset.index;
@@ -611,11 +612,8 @@
       value = +value;
     }
 
-    // データ更新 & 保存
     products[idx][key] = value;
     saveProducts();
-
-    // メイン画面の再描画（計算結果など更新）
     renderMain();
 
     // 品番(code)だけヘッダーの表示名も更新する
@@ -629,7 +627,6 @@
       }
     }
   }
- 
 
   function deleteProduct(idx){
     if(!confirm("この品番を削除しますか？")) return;
@@ -640,6 +637,7 @@
     if(currentIndex>=products.length) currentIndex = products.length-1;
     saveProducts();
     renderMain();
+    renderSettings();
   }
 
   // JSON エクスポート
