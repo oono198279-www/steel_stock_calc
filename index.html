@@ -321,8 +321,8 @@
     <div class="card-header">
       <h1>鋼材在庫 → 加工可能個数 計算</h1>
       <ul>
-        <li>通常画面では「鋼材束重量（kg）」と「鋼材本数（本）」だけ入力します。</li>
-        <li>品番・製品全長・SC長さなどは「全品番の設定」から編集します。</li>
+        <li>通常画面では鋼材束重量と鋼材本数だけ入力します。</li>
+        <li>品番・製品全長・SC長さなどは「設定」から編集します。</li>
         <li>1本あたりの生産数・鋼材本数合計・加工可能個数は自動計算されます。</li>
       </ul>
     </div>
@@ -335,7 +335,7 @@
       <button class="btn btn-ghost" id="btnImportJson">JSONから復元</button>
     </div>
 
-    <button class="btn btn-primary btn-wide" id="btnOpenSettings">全品番の設定</button>
+    <button class="btn btn-primary btn-wide" id="btnOpenSettings">設定</button>
 
     <div class="info-card" id="currentInfo">
       <div class="info-title" id="currentCode">---</div>
@@ -395,7 +395,7 @@
 <!-- 設定モーダル -->
 <div class="modal" id="settingsModal">
   <div class="modal-content">
-    <div class="modal-title">全品番の設定</div>
+    <div class="modal-title">設定</div>
     <div class="modal-desc">
       品番ごとの寸法・条件を編集します。<br>
       ※鋼材束重量・鋼材本数（本）は通常画面からも編集できます。
