@@ -600,21 +600,36 @@
       container.appendChild(block);
     });
   }
-
   function onSettingsInput(ev){
     const input = ev.currentTarget;
     const idx = +input.dataset.index;
     const key = input.dataset.key;
     let value = input.value;
-    if(input.type === "number" && value !== ""){
+
+    // 数値フィールドは number に変換
+    if (input.type === "number" && value !== "") {
       value = +value;
     }
+
+    // データ更新 & 保存
     products[idx][key] = value;
     saveProducts();
+
+    // メイン画面の再描画（計算結果など更新）
     renderMain();
-    // タイトルの表示更新
-    renderSettings();
+
+    // 品番(code)だけヘッダーの表示名も更新する
+    if (key === "code") {
+      const block = input.closest(".product-block");
+      if (block) {
+        const title = block.querySelector(".product-name");
+        if (title) {
+          title.textContent = value || `品番${idx + 1}`;
+        }
+      }
+    }
   }
+ 
 
   function deleteProduct(idx){
     if(!confirm("この品番を削除しますか？")) return;
@@ -625,7 +640,6 @@
     if(currentIndex>=products.length) currentIndex = products.length-1;
     saveProducts();
     renderMain();
-    renderSettings();
   }
 
   // JSON エクスポート
